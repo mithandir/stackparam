@@ -102,8 +102,6 @@ overridden `LD_LIBRARY_PATH`) in Linux, you can run:
 
     java -agentlib:stackparam HelloWorld
 
-Note, although untested, this library can likely be placed in the JRE's `lib/amd64` folder to get the same effect.
-
 ### Logging
 
 This library uses Rust's [env_logger](https://doc.rust-lang.org/log/env_logger/) which lets the logging be controlled
