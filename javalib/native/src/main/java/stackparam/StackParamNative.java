@@ -1,7 +1,13 @@
 package stackparam;
 
-import java.util.Arrays;
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class StackParamNative {
 
@@ -9,9 +15,11 @@ public class StackParamNative {
      * Maximum number of chars a single param can take before it is chopped
      * and has an ellipsis appended.
      */
-    public static int MAX_PARAM_STR_LEN = 50;
+    public static final int MAX_PARAM_STR_LEN = 50;
+    public static final String FILTER_FILE = "filter.txt";
 
     public static Method DEFAULT_TO_STRING;
+
     static {
         try {
             DEFAULT_TO_STRING = Object.class.getMethod("toString");
@@ -23,23 +31,23 @@ public class StackParamNative {
     /**
      * Returns the stack params of the given thread for the given depth. It is
      * returned with closest depth first.
-     *
+     * <p>
      * Each returned sub array (representing a single depth) has params
      * including "this" as the first param for non-static methods. Each param
      * takes 3 values in the array: the string name, the string JVM type
      * signature, and the actual object. All primitives are boxed.
-     *
+     * <p>
      * In cases where the param cannot be obtained (i.e. non-"this" for native
      * methods), the string "<unknown>" becomes the value regardless of the
      * type's signature.
      *
-     * @param thread The thread to get params for
+     * @param thread   The thread to get params for
      * @param maxDepth The maximum depth to go to
      * @return Array where each value represents params for a frame. Each param
-     *         takes 3 spots in the sub-array for name, type, and value.
-     * @throws NullPointerException If thread is null
+     * takes 3 spots in the sub-array for name, type, and value.
+     * @throws NullPointerException     If thread is null
      * @throws IllegalArgumentException If maxDepth is negative
-     * @throws RuntimeException Any internal error we were not prepared for
+     * @throws RuntimeException         Any internal error we were not prepared for
      */
     public static native Object[][] loadStackParams(Thread thread, int maxDepth);
 
@@ -48,11 +56,17 @@ public class StackParamNative {
      * string. Any exceptions during string building are trapped.
      *
      * @param frameString The string to append to
-     * @param params The array for params. Must be multiple of 3 as returned by
-     *               loadStackParams.
+     * @param params      The array for params. Must be multiple of 3 as returned by
+     *                    loadStackParams.
      * @return The resulting string
      */
     public static String appendParamsToFrameString(String frameString, Object[] params) {
+        frameString = filterFrameByPackage(frameString);
+
+        if (frameString == null) {
+            return "---";
+        }
+
         try {
             if (params == null) return frameString;
             StringBuilder ret = new StringBuilder(frameString);
@@ -74,6 +88,25 @@ public class StackParamNative {
         } catch (Exception e) {
             return frameString + "[failed getting params: " + e + "]";
         }
+    }
+
+    private static String filterFrameByPackage(String frameString) {
+        File file = new File(FILTER_FILE);
+        if (file.exists() && file.canRead()) {
+            try {
+                List<String> filters = Files.lines(Paths.get(file.toURI())).collect(Collectors.toList());
+
+                for (String filter : filters) {
+                    if (frameString.contains(filter)) {
+                        return null;
+                    }
+                }
+            } catch (IOException e) {
+                throw new RuntimeException("Error reading filter.txt", e);
+            }
+        }
+
+        return frameString;
     }
 
     private static String paramValToString(Object paramVal) {
@@ -100,14 +133,14 @@ public class StackParamNative {
                 String tmp = paramVal.toString();
                 String[] split = tmp.split("\\.");
                 StringBuilder out = new StringBuilder();
-                for(int i=0; i<split.length - 1; i++) {
+                for (int i = 0; i < split.length - 1; i++) {
                     String s = split[i];
                     out.append(s.charAt(0)).append(".");
                 }
-                out.append(split[split.length-1]);
+                out.append(split[split.length - 1]);
                 return out.toString();
             }
-        } catch(Exception e) {
+        } catch (Exception e) {
             //all objects have toString methods, so can't happen
             throw new RuntimeException("Can't happen", e);
         }
