@@ -104,6 +104,28 @@ overridden `LD_LIBRARY_PATH`) in Linux, you can run:
 
 Note, although untested, this library can likely be placed in the JRE's `lib/amd64` folder to get the same effect.
 
+### Filtering packages from stack trace
+
+Create a file `filter.txt` inside the classpath of you application. You can add Java packages inside the file which
+should then be filtered from a stacktrace. Instead of the package / class and it's local variables the output will be `---`.
+
+Example `filter.txt`:
+```
+org.eclipse
+org.stackparam.main.Main.testMethod
+[...]
+```
+
+Sample Output:
+
+```
+Exception in thread "main" java.lang.RuntimeException
+   at org.stackparam.data.Data.<init>(Data.java:0) [this=999 Hello this is a test 1.2]
+   at ---
+   at org.stackparam.main.Main.main(Main.java:0) [args=[-bla, 123, -c, 234]]
+
+```
+
 ### Logging
 
 This library uses Rust's [env_logger](https://doc.rust-lang.org/log/env_logger/) which lets the logging be controlled
